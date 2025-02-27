@@ -28,8 +28,12 @@ def upscale_image(image, scale_factor=4):
 def high_pass_filter(image):
     image_lab = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2LAB)
     L, A, B = cv2.split(image_lab)
-    low_pass_L = cv2.GaussianBlur(L, (3, 3), 0)
+    # Increase kernel size for more control over high-pass effect
+    low_pass_L = cv2.GaussianBlur(L, (5, 5), 0)
     high_pass_L = cv2.subtract(L, low_pass_L)
+    # Add strength parameter to control high-pass intensity
+    strength = 1.2  # Adjustable parameter (1.0 = original strength)
+    high_pass_L = cv2.multiply(high_pass_L, strength)
     L_high_pass = cv2.add(L, high_pass_L)
     processed_lab = cv2.merge([L_high_pass, A, B])
     processed_rgb = cv2.cvtColor(processed_lab, cv2.COLOR_LAB2RGB)
@@ -89,17 +93,138 @@ def autocrop_image(image_pil):
     # if no transparancy detected
     return image_pil
     
-# pipeline
-def process_image(image):
-    upscaled_image = upscale_image(image)   # Upscales 4x
-    high_pass_image = high_pass_filter(upscaled_image)  # Applies a high pass filter
-    sharpened_image = unsharp_mask(high_pass_image)  # Applies unsharp mask
-    transparent_background_image = remove(sharpened_image)    # Removes background
-    autocropped_image = autocrop_image(transparent_background_image)    # Auto-crops based on transparent background
+# Add a new function for color enhancement
+def enhance_colors(image, saturation_factor=1.2, vibrance_factor=1.1):
+    """
+    Enhances colors by adjusting saturation and vibrance.
+    Vibrance increases saturation of less-saturated colors more than already-saturated ones.
+    """
+    # Convert to numpy array
+    img_array = np.array(image)
+    
+    # Convert to HSV for better color manipulation
+    hsv = cv2.cvtColor(img_array, cv2.COLOR_RGB2HSV).astype(np.float32)
+    
+    # Saturation adjustment (uniform)
+    hsv[:, :, 1] = hsv[:, :, 1] * saturation_factor
+    
+    # Vibrance (selective saturation)
+    # Calculate current saturation level
+    sat_mask = hsv[:, :, 1] / 255.0
+    # Apply more saturation to less saturated pixels
+    vibrance_effect = (1 - sat_mask) * (vibrance_factor - 1)
+    hsv[:, :, 1] = np.clip(hsv[:, :, 1] * (1 + vibrance_effect), 0, 255)
+    
+    # Convert back to RGB
+    hsv = np.clip(hsv, 0, 255).astype(np.uint8)
+    enhanced = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+    
+    return Image.fromarray(enhanced)
+
+# Add noise reduction function
+def reduce_noise(image, strength=10):
+    """
+    Applies non-local means denoising to reduce noise while preserving details.
+    """
+    img_array = np.array(image)
+    # Apply non-local means denoising
+    denoised = cv2.fastNlMeansDenoisingColored(
+        img_array, 
+        None, 
+        strength,  # Filter strength
+        strength,  # Color component filter strength
+        7,         # Template window size
+        21         # Search window size
+    )
+    return Image.fromarray(denoised)
+
+# Add contrast enhancement function
+def enhance_contrast(image, clip_limit=2.0, tile_grid_size=(8, 8)):
+    """
+    Enhances contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+    which works better than global contrast adjustment.
+    """
+    img_array = np.array(image)
+    
+    # Convert to LAB color space
+    lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # Apply CLAHE to L channel
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+    cl = clahe.apply(l)
+    
+    # Merge channels
+    enhanced_lab = cv2.merge((cl, a, b))
+    
+    # Convert back to RGB
+    enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
+    
+    return Image.fromarray(enhanced_rgb)
+
+# Update the process_image function to include new enhancements
+def process_image(image, config=None):
+    """
+    Enhanced image processing pipeline with configurable parameters.
+    
+    Args:
+        image: PIL Image to process
+        config: Dictionary with processing parameters
+    """
+    if config is None:
+        config = {
+            'upscale_factor': 4,
+            'denoise_strength': 10,
+            'high_pass_strength': 1.2,
+            'sharpen_radius': 2,
+            'sharpen_percent': 150,
+            'sharpen_threshold': 3,
+            'enhance_contrast': True,
+            'enhance_colors': True,
+            'saturation': 1.2,
+            'vibrance': 1.1
+        }
+    
+    # Start with noise reduction (better to do this early)
+    if config.get('denoise_strength', 0) > 0:
+        image = reduce_noise(image, config.get('denoise_strength', 10))
+    
+    # Upscale
+    upscaled_image = upscale_image(image, config.get('upscale_factor', 4))
+    
+    # Enhance contrast if enabled
+    if config.get('enhance_contrast', True):
+        upscaled_image = enhance_contrast(upscaled_image)
+    
+    # Apply high pass filter
+    high_pass_image = high_pass_filter(upscaled_image)
+    
+    # Apply unsharp mask
+    sharpened_image = unsharp_mask(
+        high_pass_image, 
+        radius=config.get('sharpen_radius', 2),
+        percent=config.get('sharpen_percent', 150),
+        threshold=config.get('sharpen_threshold', 3)
+    )
+    
+    # Enhance colors if enabled
+    if config.get('enhance_colors', True):
+        sharpened_image = enhance_colors(
+            sharpened_image,
+            saturation_factor=config.get('saturation', 1.2),
+            vibrance_factor=config.get('vibrance', 1.1)
+        )
+    
+    # Remove background
+    transparent_background_image = remove(sharpened_image)
+    
+    # Auto-crop based on transparent background
+    autocropped_image = autocrop_image(transparent_background_image)
+    
     return autocropped_image
 
 # processes and renames images. inherited and used in main.py
-def batch_process_images(input_directory, output_directory):
+def batch_process_images(input_directory, output_directory, config=None):
     pass
     print(f"Loading images from {input_directory}")
     images_with_paths = load_images(input_directory)
@@ -116,7 +241,7 @@ def batch_process_images(input_directory, output_directory):
     for i, (image, path) in enumerate(images_with_paths, start=1):
         try:
             print(f"Processing {path}")
-            processed_image = process_image(image)
+            processed_image = process_image(image, config)
             original_filename = os.path.basename(path)
             new_input_filename = f'input_{i}{os.path.splitext(original_filename)[1]}'
             new_input_path = os.path.join(temp_directory, new_input_filename)
