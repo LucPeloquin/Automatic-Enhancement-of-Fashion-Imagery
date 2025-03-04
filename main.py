@@ -16,6 +16,8 @@ from PIL import Image, ImageFilter, ImageChops
 from rembg import remove
 import os
 import shutil
+import multiprocessing
+from functools import partial
 
 # upscales the image using Lancoz
 def upscale_image(image, scale_factor=4):
@@ -162,42 +164,282 @@ def enhance_contrast(image, clip_limit=2.0, tile_grid_size=(8, 8)):
     
     return Image.fromarray(enhanced_rgb)
 
+# Content-Aware Resizing
+def content_aware_resize(image, target_width, target_height):
+    """
+    Resizes image while preserving important content using seam carving.
+    Requires installation of: pip install pyseam
+    """
+    try:
+        import pyseam
+        img_array = np.array(image)
+        resized = pyseam.seam_carve(img_array, target_width, target_height)
+        return Image.fromarray(resized)
+    except ImportError:
+        print("PySeam not installed. Falling back to standard resize.")
+        return image.resize((target_width, target_height), Image.LANCZOS)
+
+# Automatic White Balance Correction
+def auto_white_balance(image):
+    """
+    Applies automatic white balance correction using gray world assumption.
+    """
+    img_array = np.array(image).astype(np.float32)
+    
+    # Calculate average values for each channel
+    avg_b = np.average(img_array[:, :, 0])
+    avg_g = np.average(img_array[:, :, 1])
+    avg_r = np.average(img_array[:, :, 2])
+    avg = (avg_b + avg_g + avg_r) / 3
+    
+    # Calculate scaling factors
+    b_factor = avg / avg_b if avg_b > 0 else 1
+    g_factor = avg / avg_g if avg_g > 0 else 1
+    r_factor = avg / avg_r if avg_r > 0 else 1
+    
+    # Apply scaling factors
+    img_array[:, :, 0] = np.clip(img_array[:, :, 0] * b_factor, 0, 255)
+    img_array[:, :, 1] = np.clip(img_array[:, :, 1] * g_factor, 0, 255)
+    img_array[:, :, 2] = np.clip(img_array[:, :, 2] * r_factor, 0, 255)
+    
+    return Image.fromarray(img_array.astype(np.uint8))
+
+# Shadow and Highlight Recovery
+def recover_shadows_highlights(image, shadows=0.2, highlights=0.2):
+    """
+    Recovers details in shadow and highlight areas.
+    
+    Args:
+        image: PIL Image
+        shadows: Amount of shadow recovery (0-1)
+        highlights: Amount of highlight recovery (0-1)
+    """
+    img_array = np.array(image).astype(np.float32) / 255.0
+    
+    # Convert to LAB
+    lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # Shadow recovery (increase brightness in dark areas)
+    shadow_mask = 1.0 - l
+    l_shadow = l + (shadow_mask * shadows)
+    
+    # Highlight recovery (decrease brightness in bright areas)
+    highlight_mask = l
+    l_highlight = l_shadow - (highlight_mask * highlights)
+    
+    # Merge channels
+    enhanced_lab = cv2.merge([l_highlight, a, b])
+    enhanced_rgb = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
+    
+    # Convert back to 8-bit
+    enhanced_rgb = np.clip(enhanced_rgb * 255, 0, 255).astype(np.uint8)
+    
+    return Image.fromarray(enhanced_rgb)
+
+# Texture Enhancement
+def enhance_texture(image, strength=0.5):
+    """
+    Enhances texture details in the image.
+    
+    Args:
+        image: PIL Image
+        strength: Strength of texture enhancement (0-1)
+    """
+    img_array = np.array(image)
+    
+    # Convert to grayscale for texture detection
+    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    
+    # Apply Laplacian filter to detect edges/texture
+    laplacian = cv2.Laplacian(gray, cv2.CV_32F)
+    
+    # Normalize Laplacian
+    laplacian_norm = cv2.normalize(laplacian, None, 0, 1, cv2.NORM_MINMAX)
+    
+    # Create texture mask
+    texture_mask = laplacian_norm * strength
+    
+    # Apply texture enhancement to each channel
+    enhanced = img_array.copy().astype(np.float32)
+    for i in range(3):
+        enhanced[:,:,i] = cv2.add(
+            enhanced[:,:,i], 
+            gray * texture_mask * strength
+        )
+    
+    # Clip values and convert back to uint8
+    enhanced = np.clip(enhanced, 0, 255).astype(np.uint8)
+    
+    return Image.fromarray(enhanced)
+
+# Intelligent Background Replacement
+def replace_background(image, background_color=(255, 255, 255), feather_amount=3):
+    """
+    Removes background and replaces with solid color or pattern.
+    Includes edge feathering for smoother transitions.
+    
+    Args:
+        image: PIL Image
+        background_color: RGB tuple for background color
+        feather_amount: Pixels to feather at the edges
+    """
+    # Remove background
+    no_bg = remove(image)
+    no_bg_array = np.array(no_bg)
+    
+    # Create alpha mask
+    alpha = no_bg_array[:, :, 3]
+    
+    # Create feathered alpha mask
+    feathered_alpha = cv2.GaussianBlur(alpha, (feather_amount*2+1, feather_amount*2+1), 0)
+    
+    # Create new background
+    bg = np.ones(no_bg_array.shape, dtype=np.uint8)
+    bg[:, :, 0] = background_color[0]
+    bg[:, :, 1] = background_color[1]
+    bg[:, :, 2] = background_color[2]
+    bg[:, :, 3] = 255
+    
+    # Blend foreground with background using feathered alpha
+    feathered_alpha_3d = np.stack([feathered_alpha, feathered_alpha, feathered_alpha, alpha], axis=2) / 255.0
+    blended = (no_bg_array * feathered_alpha_3d + bg * (1 - feathered_alpha_3d)).astype(np.uint8)
+    
+    return Image.fromarray(blended)
+
+# Image Quality Assessment
+def assess_image_quality(image):
+    """
+    Assesses image quality metrics to help determine if processing was successful.
+    Returns a dictionary of quality metrics.
+    """
+    img_array = np.array(image)
+    
+    # Convert to grayscale for some metrics
+    if len(img_array.shape) > 2:
+        gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = img_array
+    
+    # Calculate sharpness using Laplacian variance
+    laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+    sharpness = laplacian.var()
+    
+    # Calculate contrast
+    contrast = gray.std()
+    
+    # Calculate brightness
+    brightness = gray.mean()
+    
+    # Calculate color diversity (if color image)
+    if len(img_array.shape) > 2:
+        color_std = np.std(img_array, axis=(0,1)).mean()
+    else:
+        color_std = 0
+    
+    return {
+        'sharpness': sharpness,
+        'contrast': contrast,
+        'brightness': brightness,
+        'color_diversity': color_std
+    }
+
+# Adaptive Processing Based on Image Content
+def analyze_image_content(image):
+    """
+    Analyzes image content to determine optimal processing parameters.
+    """
+    img_array = np.array(image)
+    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    
+    # Detect if image is low light
+    is_low_light = gray.mean() < 100
+    
+    # Detect if image is high contrast
+    is_high_contrast = gray.std() > 60
+    
+    # Detect if image is noisy (using Laplacian)
+    laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+    is_noisy = laplacian.var() > 500
+    
+    # Detect if image has fine details
+    edges = cv2.Canny(gray, 100, 200)
+    has_fine_details = np.count_nonzero(edges) > (gray.size * 0.05)
+    
+    return {
+        'is_low_light': is_low_light,
+        'is_high_contrast': is_high_contrast,
+        'is_noisy': is_noisy,
+        'has_fine_details': has_fine_details
+    }
+
+def get_adaptive_config(image):
+    """
+    Creates an adaptive configuration based on image content analysis.
+    """
+    analysis = analyze_image_content(image)
+    
+    config = {
+        'upscale_factor': 4,
+        'denoise_strength': 15 if analysis['is_noisy'] else 5,
+        'high_pass_strength': 0.8 if analysis['has_fine_details'] else 1.2,
+        'sharpen_radius': 1 if analysis['has_fine_details'] else 2,
+        'sharpen_percent': 120 if analysis['is_high_contrast'] else 150,
+        'sharpen_threshold': 5 if analysis['is_noisy'] else 3,
+        'enhance_contrast': not analysis['is_high_contrast'],
+        'enhance_colors': True,
+        'saturation': 1.3 if analysis['is_low_light'] else 1.1,
+        'vibrance': 1.2 if analysis['is_low_light'] else 1.0,
+        'shadow_recovery': 0.3 if analysis['is_low_light'] else 0.1
+    }
+    
+    return config
+
 # Update the process_image function to include new enhancements
 def process_image(image, config=None):
     """
-    Enhanced image processing pipeline with configurable parameters.
+    Enhanced image processing pipeline with configurable parameters and adaptive processing.
     
     Args:
         image: PIL Image to process
         config: Dictionary with processing parameters
     """
     if config is None:
-        config = {
-            'upscale_factor': 4,
-            'denoise_strength': 10,
-            'high_pass_strength': 1.2,
-            'sharpen_radius': 2,
-            'sharpen_percent': 150,
-            'sharpen_threshold': 3,
-            'enhance_contrast': True,
-            'enhance_colors': True,
-            'saturation': 1.2,
-            'vibrance': 1.1
-        }
+        # Use adaptive configuration based on image content
+        config = get_adaptive_config(image)
     
-    # Start with noise reduction (better to do this early)
+    # Start with white balance correction if enabled
+    if config.get('auto_white_balance', True):
+        image = auto_white_balance(image)
+    
+    # Apply noise reduction early
     if config.get('denoise_strength', 0) > 0:
         image = reduce_noise(image, config.get('denoise_strength', 10))
     
-    # Upscale
+    # Upscale the image
     upscaled_image = upscale_image(image, config.get('upscale_factor', 4))
     
     # Enhance contrast if enabled
     if config.get('enhance_contrast', True):
         upscaled_image = enhance_contrast(upscaled_image)
     
+    # Recover shadows and highlights if enabled
+    if config.get('shadow_recovery', 0) > 0 or config.get('highlight_recovery', 0) > 0:
+        upscaled_image = recover_shadows_highlights(
+            upscaled_image,
+            shadows=config.get('shadow_recovery', 0.2),
+            highlights=config.get('highlight_recovery', 0.2)
+        )
+    
     # Apply high pass filter
     high_pass_image = high_pass_filter(upscaled_image)
+    
+    # Enhance texture if enabled
+    if config.get('texture_enhancement', 0) > 0:
+        high_pass_image = enhance_texture(
+            high_pass_image,
+            strength=config.get('texture_enhancement', 0.5)
+        )
     
     # Apply unsharp mask
     sharpened_image = unsharp_mask(
@@ -218,14 +460,87 @@ def process_image(image, config=None):
     # Remove background
     transparent_background_image = remove(sharpened_image)
     
+    # Replace background if specified
+    if config.get('replace_background', False):
+        transparent_background_image = replace_background(
+            transparent_background_image,
+            background_color=config.get('background_color', (255, 255, 255)),
+            feather_amount=config.get('feather_amount', 3)
+        )
+    
     # Auto-crop based on transparent background
     autocropped_image = autocrop_image(transparent_background_image)
     
+    # Assess final image quality if requested
+    if config.get('assess_quality', False):
+        quality_metrics = assess_image_quality(autocropped_image)
+        print(f"Image quality metrics: {quality_metrics}")
+    
     return autocropped_image
+
+# Parallel Processing for Batch Operations
+def parallel_batch_process(input_directory, output_directory, config=None, num_workers=None):
+    """
+    Process images in parallel using multiple CPU cores.
+    
+    Args:
+        input_directory: Directory containing input images
+        output_directory: Directory for output images
+        config: Processing configuration
+        num_workers: Number of parallel workers (defaults to CPU count)
+    """
+    if num_workers is None:
+        num_workers = multiprocessing.cpu_count()
+    
+    # Create output directory if it doesn't exist
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+    
+    # Get list of images
+    images_with_paths = load_images(input_directory)
+    if not images_with_paths:
+        print("No images found, check your directory.")
+        return
+    
+    # Create a temporary directory
+    temp_directory = os.path.join(input_directory, 'temp')
+    if not os.path.exists(temp_directory):
+        os.makedirs(temp_directory)
+    
+    # Define processing function for a single image
+    def process_single_image(item, config):
+        i, (image, path) = item
+        try:
+            print(f"Processing {path}")
+            processed_image = process_image(image, config)
+            original_filename = os.path.basename(path)
+            new_input_filename = f'input_{i}{os.path.splitext(original_filename)[1]}'
+            new_input_path = os.path.join(temp_directory, new_input_filename)
+            shutil.move(path, new_input_path)
+            output_name = f'output_{i}.png'
+            save_image(processed_image, output_directory, output_name)
+            return True
+        except Exception as e:
+            print(f"Failed to process image {path}: {e}")
+            return False
+    
+    # Process images in parallel
+    with multiprocessing.Pool(num_workers) as pool:
+        results = pool.map(
+            partial(process_single_image, config=config),
+            enumerate(images_with_paths, start=1)
+        )
+    
+    # Move processed images back and clean up
+    for file_name in os.listdir(temp_directory):
+        shutil.move(os.path.join(temp_directory, file_name), input_directory)
+    shutil.rmtree(temp_directory)
+    
+    print(f"Processed {sum(results)} images successfully.")
+    print("All processing completed. Input directory cleaned up.")
 
 # processes and renames images. inherited and used in main.py
 def batch_process_images(input_directory, output_directory, config=None):
-    pass
     print(f"Loading images from {input_directory}")
     images_with_paths = load_images(input_directory)
     if not images_with_paths:
