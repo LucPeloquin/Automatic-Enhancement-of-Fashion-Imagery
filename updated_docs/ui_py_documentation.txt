@@ -1,0 +1,73 @@
+# Automatic Enhancement of Fashion Imagery
+# Documentation for ui.py
+
+## Overview
+The ui.py file implements a user-friendly graphical interface for the image enhancement functionality provided by main.py. It allows users to select input and output folders and initiate the image processing with visual feedback.
+
+## UI Features
+
+### Simple and Intuitive Interface
+- Clean, minimalist design with dark theme
+- Clearly labeled buttons for all functions
+- Input and output directory display
+- Progress indication during processing
+
+### Directory Selection
+- Input folder selection via standard file dialog
+- Automatic creation of output folder if it doesn't exist
+- Option to manually select a different output folder
+
+### Processing Control
+- Single-click processing initiation
+- Background thread execution to keep UI responsive
+- Progress bar during processing
+- Completion notification
+
+### System Integration
+- Automatic folder opening after processing
+- Desktop notifications when processing completes
+- Cross-platform compatibility (Windows, macOS, Linux)
+- Processing time tracking and reporting
+
+## Key Functions
+
+### UI Creation and Management
+- `create_ui()`: Sets up the main application window and all UI elements
+- Configures styling, colors, and layout
+
+### Directory Handling
+- `select_input_directory()`: Opens file dialog and sets input directory
+- `select_output_directory()`: Opens file dialog and sets output directory
+- `open_folder(path)`: Platform-specific folder opening
+
+### Processing Control
+- `start_processing()`: Initiates image processing in a background thread
+- Manages progress bar visibility
+- Handles errors and completion notifications
+- Tracks and reports processing time
+
+### Notification
+- `send_notification()`: Sends desktop notification upon completion
+- Includes processing time information
+
+## Integration with main.py
+The UI directly calls the `batch_process_images()` function from main.py, passing:
+- Input directory path
+- Output directory path
+
+This integration allows users to access the powerful image enhancement capabilities without needing to write code or use the command line.
+
+## Technical Details
+- Built with Tkinter for cross-platform compatibility
+- Uses threading for non-blocking UI during processing
+- Implements platform detection for OS-specific functionality
+- Uses plyer for desktop notifications
+
+## Usage
+To use the application:
+1. Run ui.py
+2. Click "Select Input Folder" and choose a folder containing images
+3. Optionally click "Select Output Folder" to choose a custom output location
+4. Click "Start Processing" to begin enhancement
+5. Wait for the completion notification
+6. The output folder will automatically open when processing is complete 

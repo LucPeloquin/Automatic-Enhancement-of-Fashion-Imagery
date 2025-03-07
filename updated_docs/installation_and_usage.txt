@@ -1,0 +1,134 @@
+# Automatic Enhancement of Fashion Imagery
+# Installation and Usage Guide
+
+## Installation
+
+### System Requirements
+- Python 3.12 or higher
+- 4GB RAM minimum (8GB recommended for larger images)
+- 2GB free disk space for installation and processing
+
+### Installing Python Dependencies
+1. Ensure Python 3.12 is installed on your system
+2. Install required libraries using pip:
+
+```
+pip install opencv-python numpy pillow rembg plyer
+```
+
+Alternatively, use the provided requirements.txt file:
+
+```
+pip install -r requirements.txt
+```
+
+### Optional Dependencies
+For content-aware resizing functionality:
+```
+pip install pyseam
+```
+
+## Running the Application
+
+### Using the Graphical Interface
+1. Navigate to the project directory
+2. Run the UI application:
+   ```
+   python ui.py
+   ```
+3. Use the interface to:
+   - Select an input folder containing images
+   - Choose an output folder (or use the default)
+   - Start the processing
+
+### Using the Command Line (Advanced Users)
+For direct access to the enhancement functions, you can import and use the main.py module in your Python scripts:
+
+```python
+import main
+
+# Process a single image
+from PIL import Image
+image = Image.open('path/to/image.jpg')
+enhanced_image = main.process_image(image)
+enhanced_image.save('path/to/output.png')
+
+# Process a folder of images
+main.batch_process_images('path/to/input_folder', 'path/to/output_folder')
+
+# Process images in parallel
+main.parallel_batch_process('path/to/input_folder', 'path/to/output_folder')
+```
+
+## Usage Tips
+
+### Supported Image Formats
+- The application accepts JPG, JPEG, and PNG image formats
+- Output images are saved as PNG to preserve transparency
+
+### Optimal Input Images
+For best results:
+- Use images with the product clearly visible
+- Ensure adequate lighting in the original image
+- Higher resolution input images will yield better results
+- Images should focus primarily on the fashion item
+
+### Processing Time
+Processing time depends on:
+- Image size and resolution
+- Number of images being processed
+- Your computer's specifications
+- Selected enhancement options
+
+Expect approximately 5-15 seconds per image on an average computer.
+
+### Customizing Enhancement Parameters
+Advanced users can modify the enhancement parameters by editing the configuration in main.py:
+
+```python
+# Example of custom configuration
+custom_config = {
+    'upscale_factor': 2,  # Lower for faster processing
+    'denoise_strength': 10,
+    'high_pass_strength': 1.0,
+    'sharpen_radius': 2,
+    'sharpen_percent': 130,
+    'sharpen_threshold': 3,
+    'enhance_contrast': True,
+    'enhance_colors': True,
+    'saturation': 1.1,
+    'vibrance': 1.0,
+    'shadow_recovery': 0.2
+}
+
+# Use custom config with processing functions
+main.process_image(image, custom_config)
+main.batch_process_images(input_dir, output_dir, custom_config)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### "No module named X" Error
+This indicates a missing Python dependency. Install it using:
+```
+pip install X
+```
+
+#### Processing Fails on Large Images
+For very large images, you may encounter memory errors. Try:
+- Reducing the upscale_factor in the configuration
+- Processing fewer images at once
+- Closing other memory-intensive applications
+
+#### Background Removal Issues
+The background removal quality depends on image contrast between subject and background:
+- For better results, ensure good lighting separation between subject and background
+- Consider pre-cropping images with very complex backgrounds
+
+### Getting Help
+If you encounter issues not covered here:
+- Check the project documentation
+- Examine the console output for error messages
+- Contact the developer at [contact information] 

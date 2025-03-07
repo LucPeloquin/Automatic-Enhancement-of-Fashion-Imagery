@@ -1,0 +1,106 @@
+# Automatic Enhancement of Fashion Imagery
+# Documentation for main.py
+
+## Overview
+The main.py file implements a comprehensive image enhancement pipeline specifically designed for fashion images from Grailed.com listings. It provides a set of functions for automatically enhancing and removing backgrounds from fashion product images.
+
+## Key Enhancement Features
+
+### Image Upscaling
+- Uses Lanczos algorithm for high-quality 4x upscaling
+- Preserves details while increasing resolution
+
+### Detail Enhancement
+- High-pass filtering to enhance fine details
+- Unsharp masking with configurable radius, percent, and threshold parameters
+- Texture enhancement for bringing out fabric details
+
+### Color Processing
+- Color enhancement with separate saturation and vibrance controls
+- Automatic white balance correction using gray world assumption
+- Shadow and highlight recovery for better dynamic range
+- Contrast enhancement using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+
+### Background Processing
+- Background removal using the rembg library
+- Intelligent background replacement with configurable colors
+- Edge feathering for smoother transitions between subject and background
+- Auto-cropping based on content boundaries
+
+### Image Quality Improvements
+- Noise reduction using non-local means denoising
+- Content-aware resizing that preserves important image elements
+
+### Adaptive Processing
+The system analyzes image content to determine optimal processing parameters based on:
+- Low light detection
+- High contrast detection
+- Noise detection
+- Fine detail detection
+
+This allows the enhancement pipeline to adapt to different types of fashion images automatically.
+
+### Quality Assessment
+Includes image quality metrics calculation for:
+- Sharpness (using Laplacian variance)
+- Contrast
+- Brightness
+- Color diversity
+
+## Processing Functions
+
+### Core Enhancement Functions
+- `upscale_image()`: Upscales images using Lanczos algorithm
+- `high_pass_filter()`: Applies high-pass filtering for detail enhancement
+- `unsharp_mask()`: Sharpens images while maintaining color integrity
+- `enhance_colors()`: Adjusts saturation and vibrance
+- `reduce_noise()`: Applies non-local means denoising
+- `enhance_contrast()`: Uses CLAHE for adaptive contrast enhancement
+- `auto_white_balance()`: Corrects white balance using gray world assumption
+- `recover_shadows_highlights()`: Improves details in dark and bright areas
+- `enhance_texture()`: Enhances texture details in the image
+
+### Background Processing Functions
+- `autocrop_image()`: Automatically crops images based on content
+- `replace_background()`: Removes and replaces backgrounds with feathered edges
+
+### Analysis Functions
+- `assess_image_quality()`: Calculates image quality metrics
+- `analyze_image_content()`: Analyzes image to determine optimal processing
+- `get_adaptive_config()`: Creates configuration based on image analysis
+
+### Batch Processing
+- `batch_process_images()`: Sequential processing of multiple images
+- `parallel_batch_process()`: Parallel processing using multiple CPU cores
+- Includes automatic file renaming and temporary directory management
+
+## Processing Pipeline
+The main processing pipeline in `process_image()` follows these steps:
+1. White balance correction
+2. Noise reduction
+3. Image upscaling
+4. Contrast enhancement
+5. Shadow and highlight recovery
+6. High-pass filtering
+7. Texture enhancement
+8. Unsharp masking
+9. Color enhancement
+10. Background removal
+11. Background replacement (if configured)
+12. Auto-cropping
+13. Quality assessment (if configured)
+
+## Integration with UI
+The main.py functions are used by ui.py to provide a user-friendly interface for:
+- Input/output directory selection
+- Progress indication
+- Completion notification
+- Automatic folder opening after processing
+
+## Usage
+The main functions can be used directly or through the UI:
+- For single image processing: `process_image(image, config)`
+- For batch processing: `batch_process_images(input_directory, output_directory, config)`
+- For parallel batch processing: `parallel_batch_process(input_directory, output_directory, config, num_workers)`
+
+Where `config` is an optional dictionary of processing parameters that can be customized or generated adaptively using `get_adaptive_config(image)`. 
