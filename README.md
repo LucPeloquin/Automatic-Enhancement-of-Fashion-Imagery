@@ -1,81 +1,233 @@
-# Updated Documentation for Automatic Enhancement of Fashion Imagery
+# Automatic Enhancement of Fashion Imagery
 
-This folder contains updated documentation that accurately reflects the current implementation of the project, particularly focusing on the functionality in main.py.
+This application provides an automated solution for enhancing fashion product images, particularly those from platforms like Grailed.com. It addresses common issues in user-submitted fashion photography such as poor lighting, low resolution, distracting backgrounds, and lack of detail clarity.
 
-## Documentation Files
+## Overview
 
-### 1. Project Overview
-**File:** `project_overview.txt`
+The project implements a comprehensive image enhancement pipeline with adaptive processing capabilities. The system analyzes each image to determine optimal processing parameters based on lighting conditions, contrast levels, noise presence, and detail complexity, ensuring tailored enhancements for different types of fashion images.
 
-A high-level overview of the entire project, including:
-- Project purpose
-- Key components
-- Technical highlights
-- Use cases
-- Technical requirements
-- Future development possibilities
+## Features
 
-### 2. Main.py Documentation
-**File:** `main_py_documentation.txt`
+- **Adaptive image processing** based on content analysis
+- **High-quality upscaling** using Lanczos algorithm (4x by default)
+- **Detail enhancement** through high-pass filtering and unsharp masking
+- **Color enhancement** with LAB color space processing
+- **Contrast improvement** using CLAHE (Contrast Limited Adaptive Histogram Equalization)
+- **Shadow and highlight recovery** for better dynamic range
+- **Noise reduction** using non-local means denoising
+- **Background removal** using the U2Net deep learning model
+- **Auto-cropping** based on content
+- **Batch processing** with parallel execution capabilities
+- **User-friendly graphical interface**
 
-Detailed documentation of the main.py file, including:
-- Overview of functionality
-- Key enhancement features
-- Processing functions
-- Processing pipeline
-- Integration with UI
-- Usage examples
+## Enhancement Pipeline
 
-### 3. UI.py Documentation
-**File:** `ui_py_documentation.txt`
+The enhancement pipeline consists of the following stages:
 
-Documentation of the ui.py file, including:
-- UI features
-- Key functions
-- Integration with main.py
-- Technical details
-- Usage instructions
+1. **Image Analysis**: The system analyzes each image to determine optimal parameters
+2. **Pre-processing**: White balance correction and noise reduction
+3. **Resolution Enhancement**: Lanczos upscaling
+4. **Color and Contrast Enhancement**: CLAHE, shadow/highlight recovery, color enhancement
+5. **Detail Enhancement**: High-pass filtering, texture enhancement, unsharp masking
+6. **Background Processing**: Background removal, optional replacement, edge feathering
+7. **Post-processing**: Auto-cropping and quality assessment
 
-### 4. Installation and Usage Guide
-**File:** `installation_and_usage.txt`
+## Requirements
 
-Comprehensive guide for installing and using the application:
-- System requirements
-- Installation instructions
-- Running the application
-- Usage tips
-- Troubleshooting
+- Python 3.12 or higher
+- Required libraries:
+  - opencv-python: For advanced image processing operations
+  - numpy: For numerical operations and array handling
+  - Pillow: For basic image manipulation and format conversion
+  - rembg: For background removal using the U2Net deep learning model
+  - plyer: For desktop notifications in the UI
 
-### 5. Technical Implementation Details
-**File:** `technical_implementation.txt`
+- Optional dependencies:
+  - pyseam: For content-aware resizing functionality
 
-In-depth technical details about the implementation:
-- Architecture overview
-- Image processing pipeline
-- Key algorithms explained
-- Parallel processing implementation
-- Adaptive configuration system
-- UI implementation
-- Performance considerations
+See requirements.txt for specific version requirements.
 
-## Using This Documentation
+## Installation
 
-These documentation files are provided in plain text format for easy reading and editing. They can be:
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/Automatic-Enhancement-of-Fashion-Imagery.git
+cd Automatic-Enhancement-of-Fashion-Imagery
 
-1. Used as a reference for understanding the codebase
-2. Converted to other formats (PDF, HTML, etc.) as needed
-3. Incorporated into the final report document (final_report_peloqj1.docx)
-4. Used as a basis for creating user manuals or developer documentation
+# Install required dependencies
+pip install -r requirements.txt
+```
 
-## Updating the .docx Report
+## Usage
 
-To update the final_report_peloqj1.docx with this information:
+### Using the Graphical Interface
 
-1. Open the .docx file in Microsoft Word or compatible word processor
-2. Replace the relevant sections with the content from these text files
-3. Format as needed to match the document style
-4. Save the updated document
+1. Run the UI application:
+   ```bash
+   python ui.py
+   ```
+2. Use the interface to:
+   - Select an input folder containing images
+   - Choose an output folder (or use the default)
+   - Start the processing
 
-## Note on Accuracy
+### Using the Command Line (Advanced Users)
 
-This documentation has been created based on a thorough analysis of the current codebase, particularly main.py and ui.py. It accurately reflects the actual implementation and functionality of the project as of the latest version. 
+For direct access to the enhancement functions, you can import and use the main.py module in your Python scripts:
+
+```python
+import main
+
+# Process a single image
+from PIL import Image
+image = Image.open('path/to/image.jpg')
+enhanced_image = main.process_image(image)
+enhanced_image.save('path/to/output.png')
+
+# Process a folder of images
+main.batch_process_images('path/to/input_folder', 'path/to/output_folder')
+
+# Process images in parallel
+main.parallel_batch_process('path/to/input_folder', 'path/to/output_folder')
+```
+
+## Customizing Enhancement Parameters
+
+Advanced users can modify the enhancement parameters:
+
+```python
+# Example of custom configuration
+custom_config = {
+    'upscale_factor': 2,  # Lower for faster processing
+    'denoise_strength': 10,
+    'high_pass_strength': 1.0,
+    'sharpen_radius': 2,
+    'sharpen_percent': 130,
+    'sharpen_threshold': 3,
+    'enhance_contrast': True,
+    'enhance_colors': True,
+    'saturation': 1.1,
+    'vibrance': 1.0,
+    'shadow_recovery': 0.2
+}
+
+# Use custom config with processing functions
+main.process_image(image, custom_config)
+main.batch_process_images(input_dir, output_dir, custom_config)
+```
+
+## Input/Output
+
+- This application accepts .jpg, .jpeg, and .png files as valid inputs
+- Output images are saved as PNG to preserve transparency
+- Input images are preserved (not deleted) during processing
+
+## File Structure
+
+- `ui.py`: The interface file with the graphical user interface
+- `main.py`: The core algorithm file containing all image processing functions
+- `requirements.txt`: List of required Python libraries
+- `final_report_peloqj1.docx` / `final_report_peloqj1.pdf`: Detailed project report
+- `final_presentation_peloqj1.pptx` / `final_presentation_peloqj1.pdf`: Project presentation
+
+## Technical Implementation
+
+### Key Algorithms
+
+#### Lanczos Upscaling
+The Lanczos algorithm uses a windowed sinc function for resampling, providing superior quality for upscaling fashion images where detail preservation is critical.
+
+#### High-Pass Filtering
+High-pass filtering enhances fine details by removing low-frequency components and emphasizing high-frequency ones. The implementation uses LAB color space to preserve color accuracy while enhancing details.
+
+#### Unsharp Masking
+Unsharp masking enhances edges by subtracting a blurred version of the image from the original, then adding the difference back with amplification.
+
+#### Adaptive Contrast Enhancement
+CLAHE (Contrast Limited Adaptive Histogram Equalization) enhances contrast locally, which is particularly effective for fashion images with varying lighting conditions.
+
+#### Background Removal
+The project uses the rembg library, which implements the U2Net deep learning model for background removal. This provides high-quality segmentation of fashion items from their backgrounds.
+
+### Adaptive Configuration System
+
+The adaptive configuration system analyzes each image to determine optimal processing parameters:
+
+```python
+def analyze_image_content(image):
+    # Detect if image is low light
+    is_low_light = gray.mean() < 100
+    
+    # Detect if image is high contrast
+    is_high_contrast = gray.std() > 60
+    
+    # Detect if image is noisy
+    is_noisy = laplacian.var() > 500
+    
+    # Detect if image has fine details
+    has_fine_details = np.count_nonzero(edges) > (gray.size * 0.05)
+```
+
+Based on this analysis, the system creates a tailored configuration for each image.
+
+## Performance Considerations
+
+- Memory usage is optimized by processing images sequentially in batch mode
+- Parallel processing is available for systems with multiple cores
+- Temporary files are managed to prevent disk space issues
+- Processing parameters can be adjusted for performance vs. quality tradeoffs
+- Processing time is approximately 6 seconds per high-resolution image on an average computer
+
+## Standalone Version
+
+There is a standalone executable version of the program in dist/ui/ui.exe that has been compiled for Windows. This version has not been tested on any system other than Windows.
+
+## Sample Images
+
+Sample images are provided in the "input" and "in" folders. The "output" and "out" folders contain the corresponding processed images.
+
+Note: There is no input folder uploaded in the repository due to copyright concerns.
+
+## Limitations
+
+- Background removal quality depends on contrast between subject and background
+- Very low-resolution images may not provide enough detail for successful enhancement
+- Processing very large images may require more memory
+
+## Future Development
+
+Potential improvements include:
+- AI-based object recognition for smarter cropping
+- Style transfer options for consistent product presentation
+- Batch configuration profiles for different product categories
+- Cloud processing integration for higher throughput
+- Mobile application version
+
+## Troubleshooting
+
+### Common Issues
+
+#### "No module named X" Error
+This indicates a missing Python dependency. Install it using:
+```bash
+pip install X
+```
+
+#### Processing Fails on Large Images
+For very large images, you may encounter memory errors. Try:
+- Reducing the upscale_factor in the configuration
+- Processing fewer images at once
+- Closing other memory-intensive applications
+
+#### Background Removal Issues
+The background removal quality depends on image contrast between subject and background:
+- For better results, ensure good lighting separation between subject and background
+- Consider pre-cropping images with very complex backgrounds
+
+## License
+
+[Specify your license here]
+
+## Acknowledgments
+
+[Add any acknowledgments here] 
