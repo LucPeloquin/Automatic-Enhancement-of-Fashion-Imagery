@@ -1,0 +1,41 @@
+# Python bytecode files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Documentation folder
+updated_docs/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Output folders that might contain processed images
+output/
+out/
+
+# Input folders that might contain sample images
+# Commented out to allow sample images to be included if needed
+# input/
+# in/ 
