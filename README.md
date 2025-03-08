@@ -51,7 +51,7 @@ See requirements.txt for specific version requirements.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/Automatic-Enhancement-of-Fashion-Imagery.git
+git clone https://github.com/LucPeloquin/Automatic-Enhancement-of-Fashion-Imagery.git
 cd Automatic-Enhancement-of-Fashion-Imagery
 
 # Install required dependencies
@@ -202,32 +202,3 @@ Potential improvements include:
 - Batch configuration profiles for different product categories
 - Cloud processing integration for higher throughput
 - Mobile application version
-
-## Troubleshooting
-
-### Common Issues
-
-#### "No module named X" Error
-This indicates a missing Python dependency. Install it using:
-```bash
-pip install X
-```
-
-#### Processing Fails on Large Images
-For very large images, you may encounter memory errors. Try:
-- Reducing the upscale_factor in the configuration
-- Processing fewer images at once
-- Closing other memory-intensive applications
-
-#### Background Removal Issues
-The background removal quality depends on image contrast between subject and background:
-- For better results, ensure good lighting separation between subject and background
-- Consider pre-cropping images with very complex backgrounds
-
-## License
-
-[Specify your license here]
-
-## Acknowledgments
-
-[Add any acknowledgments here] 
